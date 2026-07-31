@@ -3,8 +3,11 @@
 import os
 import re
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 
 _SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env", "dist",
@@ -43,11 +46,15 @@ def _read_small(path: Path) -> str | None:
         return None
 
 
-class CudaDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class CudaDetectionResult(BaseModel):
+    gpu_required: bool = False
+    cuda_required: bool = False
 
-    def detect(self, repo_path: Path) -> dict:
+
+class CudaDetector(Detector[CudaDetectionResult]):
+    result_model: ClassVar[type[CudaDetectionResult]] = CudaDetectionResult
+
+    def detect(self, repo_path: Path) -> CudaDetectionResult:
         """Check manifests for CUDA build tags/nvidia- packages, Dockerfiles
         for CUDA base images, and source files for torch.cuda/cupy/
         CUDA_VISIBLE_DEVICES usage."""
@@ -57,7 +64,7 @@ class CudaDetector(BaseDetector):
         scanned_sources = 0
 
         if not repo_path.is_dir():
-            return {"gpu_required": False, "cuda_required": False}
+            return CudaDetectionResult()
 
         try:
             for dirpath, dirnames, filenames in os.walk(repo_path):
@@ -101,4 +108,4 @@ class CudaDetector(BaseDetector):
             pass  # walking the tree failed partway through; use what we found
 
         gpu_required = cuda_required or gpu_signal
-        return {"gpu_required": gpu_required, "cuda_required": cuda_required}
+        return CudaDetectionResult(gpu_required=gpu_required, cuda_required=cuda_required)

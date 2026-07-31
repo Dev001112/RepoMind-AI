@@ -1,10 +1,13 @@
-"""Detects declared dependencies. Phase 2 placeholder."""
+"""Detects declared dependencies."""
 import json
 import re
 import tomllib
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 
 # Matches "name==1.2.3", "name>=1.2", "name~=1.0", "name[extra]>=1.0", or bare "name".
 _REQ_RE = re.compile(r"^\s*([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*(.*?)\s*$")
@@ -136,11 +139,14 @@ def _parse_cargo_toml(repo_path: Path, deps: dict[str, str]) -> None:
             deps.setdefault(name, "*")
 
 
-class DependencyDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class DependencyDetectionResult(BaseModel):
+    dependencies: dict[str, str] = {}
 
-    def detect(self, repo_path: Path) -> dict:
+
+class DependencyDetector(Detector[DependencyDetectionResult]):
+    result_model: ClassVar[type[DependencyDetectionResult]] = DependencyDetectionResult
+
+    def detect(self, repo_path: Path) -> DependencyDetectionResult:
         """Parses manifests (requirements.txt, pyproject.toml, package.json,
         go.mod, Cargo.toml) into a name->version-constraint map."""
         deps: dict[str, str] = {}
@@ -155,4 +161,4 @@ class DependencyDetector(BaseDetector):
                 parser(repo_path, deps)
             except Exception:
                 continue
-        return {"dependencies": deps}
+        return DependencyDetectionResult(dependencies=deps)

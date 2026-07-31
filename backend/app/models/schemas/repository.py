@@ -12,7 +12,9 @@ from app.models.schemas.base import CamelModel
 class RepositoryStatus(StrEnum):
     PENDING = "pending"
     CLONING = "cloning"
-    ANALYZING = "analyzing"
+    SCANNING = "scanning"
+    KNOWLEDGE_BUILT = "knowledge_built"
+    EMBEDDING = "embedding"
     READY = "ready"
     FAILED = "failed"
 
@@ -27,5 +29,7 @@ class RepositoryRead(CamelModel):
     upload_filename: str | None = None
     status: RepositoryStatus
     local_path: str | None = None
+    last_error: str | None = None
+    last_error_stage: str | None = None
     created_at: datetime
     updated_at: datetime

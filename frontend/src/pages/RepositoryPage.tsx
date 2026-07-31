@@ -5,6 +5,7 @@ import { ArrowRight, ExternalLink, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Markdown } from "@/components/Markdown";
 import { cn } from "@/lib/utils";
 import {
   useRepository,
@@ -15,10 +16,19 @@ import type { ChatMessage, RepositoryStatus } from "@/types/repository";
 
 const STAGES: { status: RepositoryStatus; label: string }[] = [
   { status: "cloning", label: "clone repository" },
-  { status: "analyzing", label: "detect languages/frameworks/deps/docker/cuda, parse source, generate embeddings" },
+  { status: "scanning", label: "detect languages/frameworks/deps/docker/cuda/cicd/apis, parse source" },
+  { status: "knowledge_built", label: "assemble repository knowledge" },
+  { status: "embedding", label: "generate embeddings" },
 ];
 
-const STATUS_ORDER: RepositoryStatus[] = ["pending", "cloning", "analyzing", "ready"];
+const STATUS_ORDER: RepositoryStatus[] = [
+  "pending",
+  "cloning",
+  "scanning",
+  "knowledge_built",
+  "embedding",
+  "ready",
+];
 
 function stageState(stage: RepositoryStatus, current: RepositoryStatus): "done" | "active" | "queued" {
   const stageIdx = STATUS_ORDER.indexOf(stage);
@@ -37,7 +47,9 @@ const STAGE_DOT_STYLE = {
 const STATUS_STYLE: Record<RepositoryStatus, string> = {
   pending: "bg-primary animate-pulse",
   cloning: "bg-primary animate-pulse",
-  analyzing: "bg-primary animate-pulse",
+  scanning: "bg-primary animate-pulse",
+  knowledge_built: "bg-primary animate-pulse",
+  embedding: "bg-primary animate-pulse",
   ready: "bg-success",
   failed: "bg-destructive",
 };
@@ -143,7 +155,7 @@ export function RepositoryPage() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <h1 className="font-mono text-lg font-semibold text-foreground">
-            {knowledge?.name ?? repository.sourceUrl?.replace(/^https?:\/\/(www\.)?/, "") ?? repository.uploadFilename}
+            {knowledge?.metadata.name ?? repository.sourceUrl?.replace(/^https?:\/\/(www\.)?/, "") ?? repository.uploadFilename}
           </h1>
           <StatusPill status={repository.status} />
         </div>
@@ -158,8 +170,8 @@ export function RepositoryPage() {
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
-        {knowledge?.description && (
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{knowledge.description}</p>
+        {knowledge?.metadata.description && (
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{knowledge.metadata.description}</p>
         )}
       </div>
 
@@ -172,9 +184,9 @@ export function RepositoryPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Something went wrong analyzing this repository -- check the backend logs for
-              repository {repository.id}. Common causes: an invalid or private URL without a
-              GitHub token configured, or a malformed zip upload.
+              {repository.lastError
+                ? `Failed during "${repository.lastErrorStage}": ${repository.lastError}`
+                : `Something went wrong analyzing this repository -- check the backend logs for repository ${repository.id}. Common causes: an invalid or private URL without a GitHub token configured, or a malformed zip upload.`}
             </p>
           </CardContent>
         </Card>
@@ -221,58 +233,58 @@ export function RepositoryPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Section title="languages & frameworks">
             <div className="flex flex-wrap gap-1.5">
-              {knowledge.languages.map((l) => (
+              {knowledge.languages.languages.map((l) => (
                 <Badge key={l}>{l}</Badge>
               ))}
-              {knowledge.frameworks.map((f) => (
+              {knowledge.frameworks.frameworks.map((f) => (
                 <Badge key={f} variant="outline">
                   {f}
                 </Badge>
               ))}
-              {knowledge.languages.length === 0 && knowledge.frameworks.length === 0 && (
+              {knowledge.languages.languages.length === 0 && knowledge.frameworks.frameworks.length === 0 && (
                 <p className="text-sm text-muted-foreground">None detected.</p>
               )}
             </div>
           </Section>
 
           <Section title="requirements">
-            <Requirement label="GPU required" value={knowledge.gpuRequired} />
-            <Requirement label="CUDA required" value={knowledge.cudaRequired} />
-            <Requirement label="Docker support" value={knowledge.dockerSupport} trueIsGood />
+            <Requirement label="GPU required" value={knowledge.cuda.gpuRequired} />
+            <Requirement label="CUDA required" value={knowledge.cuda.cudaRequired} />
+            <Requirement label="Docker support" value={knowledge.docker.dockerSupport} trueIsGood />
           </Section>
 
           <Section title="readiness">
             <div className="flex flex-col gap-1.5 text-sm">
               <p>
                 <span className="text-muted-foreground">production readiness:</span>{" "}
-                {knowledge.productionReadiness ?? "unknown"}
+                {knowledge.architecture.productionReadiness ?? "unknown"}
               </p>
               <p>
                 <span className="text-muted-foreground">difficulty:</span>{" "}
-                {knowledge.difficultyLevel ?? "unknown"}
+                {knowledge.architecture.difficultyLevel ?? "unknown"}
               </p>
               <p>
                 <span className="text-muted-foreground">license:</span>{" "}
-                {knowledge.license ?? "unknown"}
+                {knowledge.metadata.license ?? "unknown"}
               </p>
             </div>
           </Section>
 
           <Section title="install">
-            {knowledge.installationSteps.length > 0 ? (
+            {knowledge.documentation.installationSteps.length > 0 ? (
               <pre className="overflow-x-auto rounded-md bg-background p-3 font-mono text-xs leading-relaxed text-foreground">
-                {knowledge.installationSteps.join("\n")}
+                {knowledge.documentation.installationSteps.join("\n")}
               </pre>
             ) : (
               <p className="text-sm text-muted-foreground">No installation steps detected.</p>
             )}
           </Section>
 
-          {knowledge.architectureSummary && (
+          {knowledge.architecture.summary && (
             <div className="md:col-span-2">
               <Section title="architecture">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  {knowledge.architectureSummary}
+                  {knowledge.architecture.summary}
                 </p>
               </Section>
             </div>
@@ -287,22 +299,27 @@ export function RepositoryPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+          <div className="flex max-h-[32rem] flex-col gap-3 overflow-y-auto">
             {messages.length === 0 && (
               <p className="font-mono text-xs text-muted-foreground">
                 no messages yet -- ask something below.
               </p>
             )}
-            {messages.map((message, index) => (
-              <p key={index} className="font-mono text-sm leading-relaxed">
-                <span
-                  className={message.role === "user" ? "text-muted-foreground" : "text-primary"}
-                >
-                  {message.role === "user" ? "you ›" : "repomind ›"}
-                </span>{" "}
-                <span className="text-foreground">{message.content}</span>
-              </p>
-            ))}
+            {messages.map((message, index) =>
+              message.role === "user" ? (
+                <p key={index} className="font-mono text-sm leading-relaxed">
+                  <span className="text-muted-foreground">you ›</span>{" "}
+                  <span className="text-foreground">{message.content}</span>
+                </p>
+              ) : (
+                <div key={index} className="font-mono text-sm leading-relaxed">
+                  <span className="text-primary">repomind ›</span>
+                  <div className="mt-1 text-foreground">
+                    <Markdown content={message.content} />
+                  </div>
+                </div>
+              ),
+            )}
           </div>
           <form onSubmit={handleAsk} className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-2.5 focus-within:ring-1 focus-within:ring-ring">
             <span className="font-mono text-primary">&gt;</span>

@@ -15,16 +15,17 @@ from app.ai.langgraph.graph import build_graph
 from app.ai.retriever.repository_retriever import get_repository_retriever
 from app.api.deps import get_chat_model, get_db, get_vectorstore
 from app.core.exceptions import RepositoryNotFoundError
-from app.models.orm.knowledge import RepositoryKnowledge as RepositoryKnowledgeORM
 from app.models.orm.repository import Repository
 from app.models.schemas.chat import ChatRequest, ChatResponse
+from app.models.schemas.knowledge import RepositoryKnowledge
+from app.services.knowledge_builder.persistence import load_knowledge
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-def _build_known_facts(knowledge: RepositoryKnowledgeORM | None) -> str:
+def _build_known_facts(knowledge: RepositoryKnowledge | None) -> str:
     """Compact summary of what's already been deterministically detected/summarized
     -- given to the general chat lens so it doesn't have to guess "what is this
     project for" purely from whatever a similarity search happens to retrieve."""
@@ -32,14 +33,14 @@ def _build_known_facts(knowledge: RepositoryKnowledgeORM | None) -> str:
         return "No analysis summary available yet."
     return "\n".join(
         [
-            f"Name: {knowledge.name or 'unknown'}",
-            f"Description: {knowledge.description or 'none given'}",
-            f"Type: {knowledge.repository_type or 'unknown'}",
-            f"Languages: {', '.join(knowledge.languages or []) or 'none detected'}",
-            f"Frameworks: {', '.join(knowledge.frameworks or []) or 'none detected'}",
-            f"Use cases: {'; '.join(knowledge.use_cases or []) or 'none determined'}",
+            f"Name: {knowledge.metadata.name or 'unknown'}",
+            f"Description: {knowledge.metadata.description or 'none given'}",
+            f"Type: {knowledge.metadata.repository_type or 'unknown'}",
+            f"Languages: {', '.join(knowledge.languages.languages) or 'none detected'}",
+            f"Frameworks: {', '.join(knowledge.frameworks.frameworks) or 'none detected'}",
+            f"Use cases: {'; '.join(knowledge.architecture.use_cases) or 'none determined'}",
             "Potential applications: "
-            + ("; ".join(knowledge.potential_applications or []) or "none determined"),
+            + ("; ".join(knowledge.architecture.potential_applications) or "none determined"),
         ]
     )
 
@@ -56,11 +57,7 @@ def chat_with_repository(
     if repository is None:
         raise RepositoryNotFoundError(str(repository_id))
 
-    knowledge = (
-        db.query(RepositoryKnowledgeORM)
-        .filter(RepositoryKnowledgeORM.repository_id == repository_id)
-        .first()
-    )
+    knowledge = load_knowledge(db, repository_id)
 
     retriever = get_repository_retriever(vectorstore, str(repository_id))
     graph = build_graph(retriever, llm)
@@ -69,9 +66,8 @@ def chat_with_repository(
             {
                 "question": payload.question,
                 "known_facts": _build_known_facts(knowledge),
-                "security_findings": (knowledge.security_findings if knowledge else None) or [],
-                "architecture_summary": (knowledge.architecture_summary if knowledge else None)
-                or "",
+                "security_findings": knowledge.security.findings if knowledge else [],
+                "architecture_summary": (knowledge.architecture.summary if knowledge else None) or "",
             }
         )
     except Exception as exc:

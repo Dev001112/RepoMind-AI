@@ -1,15 +1,21 @@
 """Detects which package manager(s) the repo uses."""
 
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 
 
-class PackageManagerDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class PackageManagerDetectionResult(BaseModel):
+    package_managers: list[str] = []
 
-    def detect(self, repo_path: Path) -> dict:
+
+class PackageManagerDetector(Detector[PackageManagerDetectionResult]):
+    result_model: ClassVar[type[PackageManagerDetectionResult]] = PackageManagerDetectionResult
+
+    def detect(self, repo_path: Path) -> PackageManagerDetectionResult:
         """Check for presence of lockfile/manifest markers at the repo root."""
         managers: list[str] = []
 
@@ -42,4 +48,4 @@ class PackageManagerDetector(BaseDetector):
         if (repo_path / "composer.lock").exists():
             managers.append("composer")
 
-        return {"package_managers": managers}
+        return PackageManagerDetectionResult(package_managers=managers)

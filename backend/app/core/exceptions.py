@@ -1,7 +1,13 @@
 """Custom application exceptions and their FastAPI exception handlers."""
 
+import uuid
+from typing import TYPE_CHECKING
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+if TYPE_CHECKING:
+    from app.models.schemas.repository import RepositoryStatus
 
 
 class RepositoryNotFoundError(Exception):
@@ -10,6 +16,19 @@ class RepositoryNotFoundError(Exception):
     def __init__(self, repository_id: str) -> None:
         self.repository_id = repository_id
         super().__init__(f"Repository '{repository_id}' not found")
+
+
+class PipelineStageError(Exception):
+    """Normalizes any exception raised inside a pipeline stage before it
+    reaches the orchestrator's catch-all -- every stage failure carries the
+    same shape (which stage, which repository, the original error) instead
+    of ad hoc per-stage error handling."""
+
+    def __init__(self, stage: "RepositoryStatus", repository_id: uuid.UUID, original: Exception) -> None:
+        self.stage = stage
+        self.repository_id = repository_id
+        self.original = original
+        super().__init__(f"[{stage.value}] repository {repository_id} failed: {original}")
 
 
 class UnsupportedProviderError(Exception):

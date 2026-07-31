@@ -2,8 +2,12 @@
 
 from collections import Counter
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.models.schemas.knowledge import LanguageStat
+from app.services.repository.detectors.base import Detector
 
 SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env", "dist",
@@ -49,17 +53,21 @@ EXTENSION_LANGUAGES = {
 }
 
 
-class LanguageDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class LanguageDetectionResult(BaseModel):
+    languages: list[str] = []
+    stats: list[LanguageStat] = []
 
-    def detect(self, repo_path: Path) -> dict:
+
+class LanguageDetector(Detector[LanguageDetectionResult]):
+    result_model: ClassVar[type[LanguageDetectionResult]] = LanguageDetectionResult
+
+    def detect(self, repo_path: Path) -> LanguageDetectionResult:
         """Count files by extension and rank languages by prevalence."""
         counts: Counter[str] = Counter()
 
         repo_path = Path(repo_path)
         if not repo_path.is_dir():
-            return {"languages": []}
+            return LanguageDetectionResult()
 
         for root, dirnames, filenames in repo_path.walk():
             dirnames[:] = [
@@ -72,4 +80,7 @@ class LanguageDetector(BaseDetector):
                     counts[language] += 1
 
         ranked = sorted(counts.items(), key=lambda item: item[1], reverse=True)
-        return {"languages": [language for language, _ in ranked]}
+        return LanguageDetectionResult(
+            languages=[language for language, _ in ranked],
+            stats=[LanguageStat(name=name, file_count=count) for name, count in ranked],
+        )

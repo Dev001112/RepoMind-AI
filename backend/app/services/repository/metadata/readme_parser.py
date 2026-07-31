@@ -2,6 +2,11 @@
 
 import re
 from pathlib import Path
+from typing import ClassVar
+
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 
 # Any markdown heading, level 1-6, used to find section boundaries.
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*?)\s*$")
@@ -254,36 +259,51 @@ def _parse_generic(text: str):
     return name, description, steps
 
 
-class ReadmeParser:
-    def __init__(self) -> None:
-        pass
+class ReadmeParseResult(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    license: str | None = None
+    installation_steps: list[str] = []
+    has_readme: bool = False
+    has_contributing: bool = False
+    has_license_file: bool = False
 
-    def parse(self, repo_path: Path) -> dict:
+
+class ReadmeParser(Detector[ReadmeParseResult]):
+    result_model: ClassVar[type[ReadmeParseResult]] = ReadmeParseResult
+
+    def detect(self, repo_path: Path) -> ReadmeParseResult:
         """Locate the repo's README and pull out its name, description,
         installation steps, and license (falling back to the LICENSE file
         or a README "## License" section)."""
-        empty = {"name": None, "description": None, "license": None, "installation_steps": []}
-        try:
-            readme_path = _find_file(
-                repo_path, ["readme.md", "readme.rst", "readme.txt", "readme"]
+        has_contributing = _find_file(repo_path, ["contributing.md", "contributing"]) is not None
+        has_license_file = _find_file(repo_path, ["license", "license.md", "license.txt"]) is not None
+
+        readme_path = _find_file(
+            repo_path, ["readme.md", "readme.rst", "readme.txt", "readme"]
+        )
+        if readme_path is None:
+            # No README doesn't mean no LICENSE -- still check for a standalone one.
+            return ReadmeParseResult(
+                license=_detect_license(repo_path, None),
+                has_contributing=has_contributing,
+                has_license_file=has_license_file,
             )
-            if readme_path is None:
-                # No README doesn't mean no LICENSE -- still check for a standalone one.
-                return {**empty, "license": _detect_license(repo_path, None)}
 
-            text = _read_text(readme_path)
-            if readme_path.suffix.lower() == ".md":
-                name, description, installation_steps, md_lines = _parse_markdown(text)
-                license_value = _detect_license(repo_path, md_lines)
-            else:
-                name, description, installation_steps = _parse_generic(text)
-                license_value = _detect_license(repo_path, None)
+        text = _read_text(readme_path)
+        if readme_path.suffix.lower() == ".md":
+            name, description, installation_steps, md_lines = _parse_markdown(text)
+            license_value = _detect_license(repo_path, md_lines)
+        else:
+            name, description, installation_steps = _parse_generic(text)
+            license_value = _detect_license(repo_path, None)
 
-            return {
-                "name": name,
-                "description": description,
-                "license": license_value,
-                "installation_steps": installation_steps,
-            }
-        except Exception:
-            return empty
+        return ReadmeParseResult(
+            name=name,
+            description=description,
+            license=license_value,
+            installation_steps=installation_steps,
+            has_readme=True,
+            has_contributing=has_contributing,
+            has_license_file=has_license_file,
+        )

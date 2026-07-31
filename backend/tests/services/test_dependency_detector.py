@@ -15,8 +15,7 @@ def test_detects_and_merges_requirements_and_package_json(tmp_path: Path) -> Non
         json.dumps({"dependencies": {"react": "^18.2.0"}})
     )
 
-    result = DependencyDetector().detect(tmp_path)
-    deps = result["dependencies"]
+    deps = DependencyDetector().detect(tmp_path).dependencies
 
     assert deps["requests"] == "==2.31.0"
     assert deps["numpy"] == ">=1.20"
@@ -25,7 +24,7 @@ def test_detects_and_merges_requirements_and_package_json(tmp_path: Path) -> Non
 
 
 def test_no_manifests_returns_empty_dict(tmp_path: Path) -> None:
-    assert DependencyDetector().detect(tmp_path) == {"dependencies": {}}
+    assert DependencyDetector().detect(tmp_path).dependencies == {}
 
 
 def test_corrupt_pyproject_toml_does_not_raise(tmp_path: Path) -> None:
@@ -33,4 +32,4 @@ def test_corrupt_pyproject_toml_does_not_raise(tmp_path: Path) -> None:
 
     result = DependencyDetector().detect(tmp_path)
 
-    assert result == {"dependencies": {}}
+    assert result.dependencies == {}

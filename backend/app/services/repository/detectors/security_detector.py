@@ -10,8 +10,11 @@ cheap, deterministic, and real.
 import os
 import re
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 from app.utils.file_utils import SKIP_DIRS
 
 _MAX_FILE_BYTES = 1_000_000
@@ -71,14 +74,22 @@ def _env_committed_without_gitignore(repo_path: Path) -> list[str]:
     return [".env file is committed to the repository and not covered by .gitignore"]
 
 
-class SecurityDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class SecurityDetectionResult(BaseModel):
+    security_findings: list[str] = []
 
-    def detect(self, repo_path: Path) -> dict:
+
+class SecurityDetector(Detector[SecurityDetectionResult]):
+    result_model: ClassVar[type[SecurityDetectionResult]] = SecurityDetectionResult
+
+    def confidence(self, data: SecurityDetectionResult) -> float:
+        # Regex pattern matches are real, but "is this actually exploitable" is
+        # a judgment call this cheap static pass can't make -- flag as heuristic.
+        return 0.8 if data.security_findings else 1.0
+
+    def detect(self, repo_path: Path) -> SecurityDetectionResult:
         repo_path = Path(repo_path)
         if not repo_path.is_dir():
-            return {"security_findings": []}
+            return SecurityDetectionResult()
 
         findings: list[str] = list(_env_committed_without_gitignore(repo_path))
         seen: set[str] = set()
@@ -104,7 +115,7 @@ class SecurityDetector(BaseDetector):
                         continue
                     scanned += 1
 
-                    rel = str(path.relative_to(repo_path))
+                    rel = path.relative_to(repo_path).as_posix()
                     for pattern, label, value_group in (*_SECRET_PATTERNS, *_RISKY_CODE_PATTERNS):
                         if len(findings) >= _MAX_FINDINGS:
                             break
@@ -121,4 +132,4 @@ class SecurityDetector(BaseDetector):
         except OSError:
             pass
 
-        return {"security_findings": findings}
+        return SecurityDetectionResult(security_findings=findings)

@@ -113,8 +113,8 @@ cd backend
 pytest
 ```
 
-Only two sanity tests exist so far (`/health` responds, settings load) — there's no business
-logic yet to test.
+89 tests covering detectors, the knowledge builder, the analysis pipeline orchestrator, and a
+migration smoke test (`alembic upgrade head` against a throwaway DB).
 
 ## A note on the Gemini key
 

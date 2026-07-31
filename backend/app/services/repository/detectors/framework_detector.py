@@ -3,8 +3,11 @@
 import json
 import tomllib
 from pathlib import Path
+from typing import ClassVar
 
-from app.services.repository.detectors.base import BaseDetector
+from pydantic import BaseModel
+
+from app.services.repository.detectors.base import Detector
 
 # (substring to search for, framework name). Checked in manifest-scan order;
 # first match per name wins, duplicates are skipped.
@@ -55,11 +58,14 @@ def _match(text: str, signatures: list[tuple[str, str]], found: list[str]) -> No
             found.append(name)
 
 
-class FrameworkDetector(BaseDetector):
-    def __init__(self) -> None:
-        pass
+class FrameworkDetectionResult(BaseModel):
+    frameworks: list[str] = []
 
-    def detect(self, repo_path: Path) -> dict:
+
+class FrameworkDetector(Detector[FrameworkDetectionResult]):
+    result_model: ClassVar[type[FrameworkDetectionResult]] = FrameworkDetectionResult
+
+    def detect(self, repo_path: Path) -> FrameworkDetectionResult:
         found: list[str] = []
 
         for filename in ("requirements.txt", "Pipfile"):
@@ -116,4 +122,4 @@ class FrameworkDetector(BaseDetector):
                 text = ""
             _match(text, RUST_SIGNATURES, found)
 
-        return {"frameworks": found}
+        return FrameworkDetectionResult(frameworks=found)
