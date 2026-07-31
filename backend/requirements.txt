@@ -1,0 +1,32 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+alembic==1.14.0
+# psycopg2-binary==2.9.10  # uncomment if you switch DATABASE_URL to Postgres later
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+langchain==0.3.14
+langchain-core==0.3.29
+langchain-community==0.3.14
+langchain-google-genai==2.0.8
+langchain-openai==0.3.0
+langchain-ollama==0.2.2
+langchain-huggingface==0.1.2
+langchain-qdrant==0.2.0
+langgraph==0.2.62
+
+qdrant-client==1.12.1
+gitpython==3.1.44
+# tree-sitter-languages hasn't been updated for tree-sitter>=0.22's Language() API change
+# (breaks with "TypeError: __init__() takes exactly 1 argument (2 given)") -- pin the last
+# compatible tree-sitter version rather than the newest one. Verified working together.
+tree-sitter==0.21.3
+tree-sitter-languages==1.10.2
+sentence-transformers==3.3.1
+
+python-multipart==0.0.20
+
+pytest==8.3.4
+httpx==0.28.1

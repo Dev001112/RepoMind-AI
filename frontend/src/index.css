@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  RepoMind AI is a single dark "terminal" identity, not a light/dark toggle --
+  see README design notes for the palette rationale. One committed theme,
+  executed well, beats a half-hearted light variant nobody asked for.
+*/
+@layer base {
+  :root {
+    --background: 222 47% 7%;
+    --foreground: 210 20% 92%;
+
+    --card: 222 40% 10%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 222 40% 10%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 38 92% 58%;
+    --primary-foreground: 222 47% 9%;
+
+    --secondary: 222 30% 16%;
+    --secondary-foreground: 210 20% 88%;
+
+    --muted: 222 25% 14%;
+    --muted-foreground: 215 15% 62%;
+
+    --accent: 222 30% 18%;
+    --accent-foreground: 210 20% 92%;
+
+    --destructive: 6 78% 62%;
+    --destructive-foreground: 222 47% 9%;
+
+    --success: 152 55% 45%;
+    --success-foreground: 222 47% 9%;
+
+    --border: 222 25% 18%;
+    --input: 222 25% 18%;
+    --ring: 38 92% 58%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Thin, on-palette scrollbar for the chat/log panels -- Firefox + WebKit. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+}

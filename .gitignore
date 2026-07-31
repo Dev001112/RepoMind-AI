@@ -1,0 +1,48 @@
+# --- env ---
+.env
+*.env
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Node ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# --- Storage (keep the folders, ignore their contents) ---
+backend/repositories/*
+!backend/repositories/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/generated_reports/*
+!backend/generated_reports/.gitkeep
+backend/data/*
+!backend/data/.gitkeep
+backend/qdrant_data/*
+!backend/qdrant_data/.gitkeep
+
+# --- SQLite ---
+*.db
+*.db-journal
+
+# --- Vector store data mounted by docker-compose ---
+qdrant_data/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Alembic ---
+backend/alembic/versions/*
+!backend/alembic/versions/.gitkeep
