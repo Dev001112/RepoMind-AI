@@ -1,0 +1,51 @@
+INFO:     Started server process [12224]
+INFO:     Waiting for application startup.
+2026-08-01 19:38:31 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-08-01 19:39:42 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 19:39:45 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 19:39:45 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\langchain_google_genai\chat_models.py:47: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  from google.generativeai.caching import CachedContent  # type: ignore[import]
+C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\tree_sitter\__init__.py:36: FutureWarning: Language(path, name) is deprecated. Use Language(ptr, name) instead.
+  warn("{} is deprecated. Use {} instead.".format(old, new), FutureWarning)
+2026-08-01 19:40:11 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 19:40:11 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 19:40:16 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 19:40:16 | WARNING  | root | Payload indexes have no effect in the local Qdrant. Please use server Qdrant if you need payload indexes.
+2026-08-01 19:40:16 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 19:40:18 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 19:40:18 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=ready event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:04 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:06 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:06 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\tree_sitter\__init__.py:36: FutureWarning: Language(path, name) is deprecated. Use Language(ptr, name) instead.
+  warn("{} is deprecated. Use {} instead.".format(old, new), FutureWarning)
+2026-08-01 20:49:18 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=start repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:20 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=cloning event=success repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:20 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=start repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:24 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:24 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=start repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\tree_sitter\__init__.py:36: FutureWarning: Language(path, name) is deprecated. Use Language(ptr, name) instead.
+  warn("{} is deprecated. Use {} instead.".format(old, new), FutureWarning)
+2026-08-01 20:49:29 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 20:49:29 | WARNING  | root | Payload indexes have no effect in the local Qdrant. Please use server Qdrant if you need payload indexes.
+2026-08-01 20:49:29 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 20:49:31 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:31 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=ready event=success repository=bc3595d3-a16c-44aa-a47b-f35e3445b4a2
+2026-08-01 20:49:39 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=scanning event=success repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:39 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=start repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:43 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 20:49:43 | WARNING  | root | Payload indexes have no effect in the local Qdrant. Please use server Qdrant if you need payload indexes.
+2026-08-01 20:49:44 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2026-08-01 20:49:44 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=embedding event=success repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:49:44 | INFO     | app.services.repository.pipeline.emitters | pipeline stage=ready event=success repository=b11218ff-cafc-4abc-8743-d49d623bd967
+2026-08-01 20:50:43 | INFO     | httpx | HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"

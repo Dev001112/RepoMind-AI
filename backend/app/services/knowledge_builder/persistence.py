@@ -12,6 +12,7 @@ import uuid
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.models.orm.analysis import DetectorResultRecord
 from app.models.orm.knowledge import (
     RepositoryDependency,
     RepositoryFramework,
@@ -41,6 +42,7 @@ from app.models.schemas.knowledge import (
     SymbolsSection,
     TestingSection,
 )
+from app.services.repository.detectors.base import DetectorResult
 
 
 def persist_knowledge(db: Session, repository_id: uuid.UUID, knowledge: RepositoryKnowledge) -> None:
@@ -97,6 +99,38 @@ def persist_knowledge(db: Session, repository_id: uuid.UUID, knowledge: Reposito
     for name, version_spec in knowledge.dependencies.dependencies.items():
         db.add(RepositoryDependency(repository_id=repository_id, name=name, version_spec=version_spec))
 
+    db.commit()
+
+
+def persist_detector_results(
+    db: Session,
+    repository_id: uuid.UUID,
+    run_id: uuid.UUID | None,
+    results: list[DetectorResult],
+) -> None:
+    """Store the raw typed output of every detector from this run.
+
+    Only the latest run's results are kept (the previous run's rows are
+    deleted first) -- the point is debugging *the current* knowledge, not
+    building a full result history (that lives in analysis_events/runs).
+    """
+    db.execute(delete(DetectorResultRecord).where(DetectorResultRecord.repository_id == repository_id))
+    for result in results:
+        db.add(
+            DetectorResultRecord(
+                repository_id=repository_id,
+                run_id=run_id,
+                detector_name=result.detector_name,
+                detector_version=result.detector_version,
+                confidence=result.confidence,
+                started_at=result.started_at,
+                finished_at=result.finished_at,
+                duration_ms=result.duration_ms,
+                warnings=result.warnings,
+                errors=result.errors,
+                payload=result.data.model_dump(mode="json"),
+            )
+        )
     db.commit()
 
 

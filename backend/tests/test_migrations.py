@@ -31,6 +31,7 @@ def test_alembic_upgrade_head_creates_expected_schema(tmp_path: Path) -> None:
         for expected in (
             "repositories", "repository_knowledge",
             "repository_languages", "repository_frameworks", "repository_dependencies",
+            "analysis_runs", "analysis_events", "detector_results", "repository_metrics",
         ):
             assert expected in tables
 

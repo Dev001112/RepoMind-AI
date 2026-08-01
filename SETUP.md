@@ -78,16 +78,16 @@ uvicorn app.main:app --reload --reload-dir app --port 8000
 
 Verify: http://localhost:8000/api/v1/health and http://localhost:8000/docs
 
-**Note:** `backend/alembic/versions/` is currently empty — no models have a migration yet since
-Phase 1 only scaffolds the ORM models. Generate the first migration once you're ready to create
-the tables:
+**Note:** migrations live in `backend/alembic/versions/` and the DB is created/updated with:
 
 ```bash
-alembic revision --autogenerate -m "initial schema"
 alembic upgrade head
 ```
 
-This creates `backend/repomind.db` (SQLite, gitignored).
+This creates/updates `backend/repomind.db` (SQLite, gitignored). The current schema includes the
+Repository Knowledge layer (`repository_knowledge` + normalized child tables) and the analysis
+observability tables (`analysis_runs`, `analysis_events`, `detector_results`,
+`repository_metrics`).
 
 ### 4. Frontend
 
@@ -113,8 +113,38 @@ cd backend
 pytest
 ```
 
-89 tests covering detectors, the knowledge builder, the analysis pipeline orchestrator, and a
-migration smoke test (`alembic upgrade head` against a throwaway DB).
+116 tests covering detectors, the knowledge builder, the analysis pipeline orchestrator, the
+analysis observability layer (runs/events/detector results/metrics/progress), the Semantic
+Knowledge Index (chunk builder, checksum-incremental embedding, retriever — against a throwaway
+Qdrant collection with deterministic local embeddings, no model or network), and a migration
+smoke test (`alembic upgrade head` against a throwaway DB).
+
+## The Semantic Knowledge Index
+
+The EMBEDDING stage never embeds files — it turns the persisted `RepositoryKnowledge` report into
+semantic chunks and indexes those. It needs Ollama (embeddings) and Qdrant only:
+
+- **Embeddings:** local Ollama, `nomic-embed-text` (default `EMBEDDING_PROVIDER=ollama`). The
+  chunk index lives in its own Qdrant collection (`QDRANT_COLLECTION_NAME=repomind_chunks`), so
+  re-analyses are checksum-incremental: unchanged chunks are skipped, changed ones re-embedded,
+  vanished ones swept.
+- **LLM output budget:** `LLM_MAX_OUTPUT_TOKENS` defaults to 8192. gemini-2.5-flash spends part
+  of its output budget on reasoning tokens; at the old 1024 cap the knowledge-enrichment call
+  was truncated mid-JSON, silently dropping the summary/use-cases fields (and burning ~1 minute
+  per analysis). If the enrichment output ever starts looking empty again, raise this.
+- **Local Qdrant mode:** with `QDRANT_URL` empty, the backend uses an embedded in-process Qdrant
+  (`QDRANT_LOCAL_PATH` in `backend/.env`) — zero install, already configured. Note that payload
+  indexes (full-text search) are silently ignored in this mode; the hybrid search falls back to a
+  keyword-constrained vector leg fused locally, so everything still works, just without true
+  full-text recall. The local storage folder takes an exclusive lock — only one process may use
+  it, so **stop the dev server before running the test suite** (the Qdrant-using tests need the
+  folder free; the client is lazily created at first use, so pure-DB tests run fine alongside a
+  live server).
+- **API:** `POST /repositories/{id}/search/{semantic|hybrid|context}`,
+  `GET /repositories/{id}/chunks`, `GET /repositories/{id}/chunks/{chunk_id}`,
+  `GET /repositories/{id}/knowledge/stats` — all read-only against the vector index.
+- **Frontend:** the repository page shows the Knowledge Explorer (stats grid, search with
+  semantic/hybrid toggle, category filters, paginated chunk list).
 
 ## A note on the Gemini key
 

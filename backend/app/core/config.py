@@ -64,7 +64,11 @@ class Settings(BaseSettings):
     # accuracy matter more than variety. Generous-but-bounded token cap so a
     # thorough answer (e.g. the security lens) isn't cut short, but rambling is.
     llm_temperature: float = 0.3
-    llm_max_output_tokens: int = 1024
+    # gemini-2.5-flash spends part of its output budget on reasoning tokens, so
+    # a 1024 cap routinely truncated structured JSON (the enrichment chain
+    # silently lost its judgment fields). 8192 leaves room for both the
+    # reasoning and the full answer/JSON.
+    llm_max_output_tokens: int = 8192
     gemini_api_key: str | None = None
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"

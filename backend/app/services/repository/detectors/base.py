@@ -5,6 +5,7 @@ Knowledge Builder, logs, future re-analysis diffing) can reason about
 provenance and failure without re-deriving it from a bare dict.
 """
 
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,9 +24,14 @@ class DetectorResult(BaseModel, Generic[T]):
     # heuristic signals (e.g. a README license guess, a route-regex scan) --
     # see each detector's `confidence()` override.
     confidence: float = 1.0
-    detected_at: datetime
+    started_at: datetime
+    finished_at: datetime
     errors: list[str] = []
     warnings: list[str] = []
+
+    @property
+    def duration_ms(self) -> int:
+        return round((self.finished_at - self.started_at).total_seconds() * 1000)
 
 
 class Detector(ABC, Generic[T]):
@@ -48,16 +54,19 @@ class Detector(ABC, Generic[T]):
 
     def run(self, repo_path: Path) -> DetectorResult[T]:
         errors: list[str] = []
+        started_at = datetime.now(timezone.utc)
         try:
             data = self.detect(repo_path)
         except Exception as exc:
             errors.append(str(exc))
             data = self.result_model()
+        finished_at = datetime.now(timezone.utc)
         return DetectorResult(
             detector_name=type(self).__name__,
             detector_version=self.version,
             data=data,
             confidence=self.confidence(data),
-            detected_at=datetime.now(timezone.utc),
+            started_at=started_at,
+            finished_at=finished_at,
             errors=errors,
         )

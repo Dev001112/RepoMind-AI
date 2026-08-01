@@ -23,6 +23,10 @@ class StageEvent:
     kind: Literal["start", "success", "failure"]
     message: str | None = None
     error: PipelineStageError | None = None
+    # The AnalysisRun this event belongs to -- set by the orchestrator.
+    run_id: uuid.UUID | None = None
+    # Event-log name override; defaults to f"{stage}.{kind}" in the emitter.
+    name: str | None = None
 
 
 class EventEmitter(Protocol):

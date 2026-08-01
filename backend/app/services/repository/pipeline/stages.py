@@ -4,10 +4,10 @@
 passes between stages in-memory, so every stage is already safe behind a
 future queue boundary with zero changes. The one place this would otherwise
 matter (SCANNING producing chunks that EMBEDDING needs) is resolved by
-EMBEDDING re-deriving chunks itself via `TreeSitterParser.parse()` rather
-than receiving them -- cheap, deterministic, local CPU, so paying for it
-twice is a non-issue and keeps the stage boundary real today instead of a
-"fix later" gap.
+EMBEDDING re-deriving its input from the persisted RepositoryKnowledge
+report (`load_knowledge` + the Phase 3.2 chunk builder) rather than receiving
+it -- deterministic, local CPU, so paying for it twice is a non-issue and
+keeps the stage boundary real today instead of a "fix later" gap.
 
 Note on SCANNING vs KNOWLEDGE_BUILT: detector-running and knowledge assembly
 are one atomic, in-process unit of work in this codebase (no LLM streaming
@@ -29,21 +29,33 @@ import uuid
 from pathlib import Path
 
 import git
-from qdrant_client.http.exceptions import UnexpectedResponse
-from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 from app.ai.embeddings.factory import get_embeddings
 from app.ai.llm.factory import get_chat_model
-from app.ai.vectorstore.qdrant_store import ensure_collection, get_qdrant_client, get_vectorstore
 from app.core.config import Settings
 from app.database.session import SessionLocal
 from app.models.orm.repository import Repository
 from app.models.schemas.repository import RepositoryStatus
-from app.services.knowledge_builder.persistence import persist_knowledge
+from app.services.knowledge.chunk_builder import build_knowledge_chunks
+from app.services.knowledge.embedding_service import index_knowledge_chunks
+from app.services.knowledge_builder.persistence import (
+    load_knowledge,
+    persist_detector_results,
+    persist_knowledge,
+)
 from app.services.repository.clone.github_cloner import GithubCloner
 from app.services.repository.clone.zip_extractor import ZipExtractor
-from app.services.repository.parser.chunk_builder import CodeChunk
-from app.services.repository.parser.tree_sitter_parser import TreeSitterParser
+from app.services.repository.metrics import persist_metrics
+from app.services.repository.pipeline.events import (
+    EMBEDDINGS_GENERATED,
+    KNOWLEDGE_BUILT,
+    KNOWLEDGE_CHUNKS_BUILT,
+    KNOWLEDGE_STORED,
+    VECTOR_INDEX_UPDATED,
+    DetectorEventSink,
+    record_event,
+)
+from app.services.repository.pipeline.runs import latest_running_run_id
 from app.services.repository.pipeline.types import StageDef
 from app.services.repository.scanner import RepositoryScanner
 from app.utils.file_utils import ensure_dir
@@ -101,92 +113,102 @@ def run_scanning_and_knowledge_stage(repository_id: uuid.UUID, settings: Setting
         if repository is None or repository.local_path is None:
             raise RuntimeError(f"repository {repository_id} has no local_path to scan")
         repo_path = Path(repository.local_path)
+        run_id = latest_running_run_id(db, repository_id)
+    finally:
+        db.close()
 
-        chat_model = None
-        try:
-            chat_model = get_chat_model(settings)
-        except Exception:
-            logger.warning(
-                "Could not build a chat model for knowledge enrichment; continuing without it",
-                exc_info=True,
-            )
+    chat_model = None
+    try:
+        chat_model = get_chat_model(settings)
+    except Exception:
+        logger.warning(
+            "Could not build a chat model for knowledge enrichment; continuing without it",
+            exc_info=True,
+        )
 
-        knowledge, _chunks = RepositoryScanner(chat_model=chat_model).scan(repository_id, repo_path)
+    sink = DetectorEventSink(repository_id, run_id)
+    knowledge, _chunks, detector_results = RepositoryScanner(
+        chat_model=chat_model
+    ).scan(repository_id, repo_path, sink=sink)
+    record_event(
+        repository_id, KNOWLEDGE_BUILT, run_id=run_id,
+        stage="scanning", message="repository knowledge assembled",
+    )
+
+    db = SessionLocal()
+    try:
+        persist_detector_results(db, repository_id, run_id, detector_results)
         persist_knowledge(db, repository_id, knowledge)
-
+        persist_metrics(db, repository_id, run_id, knowledge)
+        repository = db.get(Repository, repository_id)
+        if repository is None:
+            raise RuntimeError(f"repository {repository_id} not found")
         repository.status = RepositoryStatus.KNOWLEDGE_BUILT.value
         db.commit()
     finally:
         db.close()
-
-
-def run_embedding_stage(repository_id: uuid.UUID, settings: Settings) -> None:
-    db = SessionLocal()
-    try:
-        repository = db.get(Repository, repository_id)
-        if repository is None or repository.local_path is None:
-            raise RuntimeError(f"repository {repository_id} has no local_path to embed")
-        repo_path = Path(repository.local_path)
-    finally:
-        db.close()
-
-    chunks = TreeSitterParser().parse(repo_path)
-    if not chunks:
-        return
-    _embed_chunks(settings, repository_id, chunks)
-
-
-def _delete_stale_chunks(settings: Settings, repository_id: uuid.UUID, current_run_id: str) -> None:
-    """Clear this repository's chunks from PRIOR runs (matching repository_id
-    but NOT this run's run_id) -- called only after the new chunks are already
-    written, so a failed embed never leaves a repository with zero retrievable
-    chunks when it previously had working ones."""
-    client = get_qdrant_client()
-    try:
-        client.get_collection(settings.qdrant_collection_name)
-    except (UnexpectedResponse, ValueError):
-        return  # collection doesn't exist yet -- nothing to clear
-    client.delete(
-        collection_name=settings.qdrant_collection_name,
-        points_selector=Filter(
-            must=[
-                FieldCondition(
-                    key="metadata.repository_id", match=MatchValue(value=str(repository_id))
-                )
-            ],
-            must_not=[FieldCondition(key="metadata.run_id", match=MatchValue(value=current_run_id))],
-        ),
+    record_event(
+        repository_id, KNOWLEDGE_STORED, run_id=run_id,
+        stage="scanning", message="repository knowledge persisted",
     )
 
 
-def _embed_chunks(settings: Settings, repository_id: uuid.UUID, chunks: list[CodeChunk]) -> None:
-    embeddings = get_embeddings(settings)
-    # Probe once to learn the provider's vector size rather than hardcoding it.
-    vector_size = len(embeddings.embed_query(chunks[0].content[:200]))
-    ensure_collection(get_qdrant_client(), settings, vector_size)
+def run_embedding_stage(repository_id: uuid.UUID, settings: Settings) -> None:
+    """Build semantic KnowledgeChunks from the persisted knowledge and index
+    them into Qdrant -- batched, incremental (checksums), never blocking on
+    the LLM. Replaces the Phase 2 file-chunk embedding: the index now holds
+    knowledge, not raw source slices; stale Phase 2 points are swept by the
+    indexing service itself (add-then-delete, so a failure mid-way leaves the
+    previous index intact)."""
+    db = SessionLocal()
+    try:
+        repository = db.get(Repository, repository_id)
+        if repository is None:
+            raise RuntimeError(f"repository {repository_id} not found")
+        knowledge = load_knowledge(db, repository_id)
+        run_id = latest_running_run_id(db, repository_id)
+    finally:
+        db.close()
 
-    # Tag every point from this run so stale points from a PRIOR run of the same
-    # repository can be told apart and swept up once these new ones are confirmed
-    # written -- add-then-delete, not delete-then-add, so a failure here leaves
-    # the repository's previous (still working) chunks in place instead of none.
-    run_id = str(uuid.uuid4())
-    vectorstore = get_vectorstore(settings, embeddings)
-    texts = [chunk.content for chunk in chunks]
-    metadatas = [
-        {
-            "repository_id": str(repository_id),
-            "run_id": run_id,
-            "file_path": chunk.file_path,
-            "start_line": chunk.start_line,
-            "end_line": chunk.end_line,
-            "language": chunk.language,
-            "symbol_name": chunk.symbol_name,
-        }
-        for chunk in chunks
-    ]
-    vectorstore.add_texts(texts, metadatas=metadatas)
+    chunks = build_knowledge_chunks(repository_id, knowledge) if knowledge else []
+    record_event(
+        repository_id, KNOWLEDGE_CHUNKS_BUILT, run_id=run_id, stage="embedding",
+        message=f"{len(chunks)} knowledge chunks built from the analysis report",
+        data={"chunk_count": len(chunks)},
+    )
+    if not chunks:
+        # Nothing to index (empty knowledge report). Leave whatever is already
+        # there alone -- an LLM enrichment outage must not nuke a working index.
+        logger.info(
+            "embedding stage: no knowledge chunks for repository %s -- skipping",
+            repository_id,
+        )
+        return
 
-    _delete_stale_chunks(settings, repository_id, run_id)
+    try:
+        embeddings = get_embeddings(settings)
+    except Exception:
+        logger.exception("embedding stage: could not build an embedding provider")
+        raise
+
+    index_run_id = str(uuid.uuid4())
+    stats = index_knowledge_chunks(
+        settings, repository_id, chunks, embeddings, run_id=index_run_id
+    )
+    record_event(
+        repository_id, EMBEDDINGS_GENERATED, run_id=run_id, stage="embedding",
+        message=f"embedded {stats.embedded} chunks, skipped {stats.skipped} unchanged, "
+        f"removed {stats.removed} stale",
+        data={
+            "embedded": stats.embedded, "skipped": stats.skipped,
+            "removed": stats.removed, "index_run_id": index_run_id,
+        },
+    )
+    record_event(
+        repository_id, VECTOR_INDEX_UPDATED, run_id=run_id, stage="embedding",
+        message="vector index up to date",
+        data={"total_chunks": stats.total},
+    )
 
 
 PIPELINE: list[StageDef] = [

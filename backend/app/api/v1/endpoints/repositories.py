@@ -18,9 +18,15 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import RepositoryNotFoundError
 from app.models.orm.repository import Repository
 from app.models.schemas.knowledge import RepositoryKnowledge as RepositoryKnowledgeSchema
-from app.models.schemas.repository import RepositoryCreate, RepositoryRead, RepositoryStatus
+from app.models.schemas.repository import (
+    RepositoryCardRead,
+    RepositoryCreate,
+    RepositoryRead,
+    RepositoryStatus,
+)
 from app.services.knowledge_builder.persistence import load_knowledge
 from app.services.repository.analysis_pipeline import run_analysis_pipeline
+from app.services.repository.dashboard import load_dashboard_cards
 from app.utils.file_utils import ensure_dir, safe_join
 
 router = APIRouter()
@@ -121,6 +127,18 @@ def reanalyze_repository(
     repository = db.get(Repository, repository_id)
     background_tasks.add_task(run_analysis_pipeline, repository.id, force)
     return repository
+
+
+@router.get("/repositories", response_model=list[RepositoryCardRead])
+def list_repositories(
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 50,
+) -> list[dict]:
+    """Dashboard list -- all repositories, newest first, enriched with the
+    knowledge-layer stats a card needs (languages, frameworks, files,
+    symbols, endpoints, dependencies). All from the knowledge tables, never
+    from the repo on disk."""
+    return load_dashboard_cards(db, limit=min(max(limit, 1), 200))
 
 
 @router.get("/repositories/{repository_id}", response_model=RepositoryRead)

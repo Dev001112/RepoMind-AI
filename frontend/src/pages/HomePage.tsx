@@ -1,10 +1,103 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2, UploadCloud } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useSubmitRepository, useUploadRepository } from "@/hooks/useRepositories";
+import { useRepositories, useSubmitRepository, useUploadRepository } from "@/hooks/useRepositories";
+import type { RepositoryCard, RepositoryStatus } from "@/types/repository";
+
+const STATUS_STYLE: Record<RepositoryStatus, string> = {
+  pending: "bg-primary animate-pulse",
+  cloning: "bg-primary animate-pulse",
+  scanning: "bg-primary animate-pulse",
+  knowledge_built: "bg-primary animate-pulse",
+  embedding: "bg-primary animate-pulse",
+  ready: "bg-success",
+  failed: "bg-destructive",
+};
+
+function RepositoryCardItem({ card }: { card: RepositoryCard }) {
+  const title =
+    card.knowledgeName ??
+    card.sourceUrl?.replace(/^https?:\/\/(www\.)?/, "") ??
+    card.uploadFilename ??
+    card.id;
+  const subtitle = card.sourceUrl ?? card.uploadFilename ?? null;
+
+  return (
+    <Link
+      to={`/repositories/${card.id}`}
+      className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-ring"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="truncate font-mono text-sm font-medium text-foreground">{title}</span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-xs text-muted-foreground">
+          <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_STYLE[card.status])} />
+          {card.status}
+        </span>
+      </div>
+      {subtitle && (
+        <span className="truncate font-mono text-xs text-muted-foreground/70">{subtitle}</span>
+      )}
+
+      {(card.languages.length > 0 || card.frameworks.length > 0) && (
+        <div className="flex flex-wrap gap-1">
+          {card.languages.map((language) => (
+            <Badge key={language}>{language}</Badge>
+          ))}
+          {card.frameworks.map((framework) => (
+            <Badge key={framework} variant="outline">
+              {framework}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+        <span>{Math.round(card.metrics["total_files"] ?? 0).toLocaleString()} files</span>
+        <span>{Math.round(card.metrics["total_symbols"] ?? 0).toLocaleString()} symbols</span>
+        <span>{Math.round(card.metrics["endpoints"] ?? 0)} endpoints</span>
+        <span>{Math.round(card.metrics["dependencies"] ?? 0)} dependencies</span>
+      </div>
+    </Link>
+  );
+}
+
+function Dashboard() {
+  const { data: cards, isLoading } = useRepositories();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        loading repositories...
+      </div>
+    );
+  }
+  if (!cards || cards.length === 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        <h2 className="font-mono text-sm font-medium text-muted-foreground">// dashboard</h2>
+        <p className="text-sm text-muted-foreground">
+          No repositories yet -- submit one above and it will show up here once analyzed.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="font-mono text-sm font-medium text-muted-foreground">// dashboard</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {cards.map((card) => (
+          <RepositoryCardItem key={card.id} card={card} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const STAGES = [
   {
@@ -165,6 +258,8 @@ export function HomePage() {
           </div>
         ))}
       </div>
+
+      <Dashboard />
     </div>
   );
 }

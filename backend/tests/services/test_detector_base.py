@@ -31,7 +31,8 @@ def test_run_wraps_success_with_no_errors(tmp_path: Path) -> None:
     assert envelope.errors == []
     assert envelope.detector_name == "_Succeeds"
     assert envelope.confidence == 1.0
-    assert envelope.detected_at is not None
+    assert envelope.started_at <= envelope.finished_at
+    assert envelope.duration_ms >= 0
 
 
 def test_run_captures_exception_as_error_and_returns_safe_default(tmp_path: Path) -> None:
