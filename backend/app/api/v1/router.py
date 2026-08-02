@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     health,
     knowledge_search,
     repositories,
+    retrieval,
 )
 
 api_router = APIRouter()
@@ -16,3 +17,4 @@ api_router.include_router(analysis.router, tags=["analysis"])
 api_router.include_router(chat.router, tags=["chat"])
 api_router.include_router(code_intelligence.router, tags=["code-intelligence"])
 api_router.include_router(knowledge_search.router, tags=["knowledge-search"])
+api_router.include_router(retrieval.router, tags=["retrieval"])

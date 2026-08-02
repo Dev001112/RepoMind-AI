@@ -1,6 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import {
+  getQueryHistory,
+  getRetrievalMetrics,
+  getSuggestions,
+  lookupRepository,
+  retrieveRepository,
+  searchRepositoryIntelligent,
+} from "@/services/retrievalService";
+
+import {
   chatWithRepository,
   explainTarget,
   getFileDetail,
@@ -171,5 +180,56 @@ export function useKnowledgeSearch(id: string | undefined) {
       mode: "semantic" | "hybrid";
       filters: { type?: string };
     }) => searchRepositoryKnowledge(id as string, query, mode, filters),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3.3 — intelligent retrieval
+// ---------------------------------------------------------------------------
+
+export function useRetrieve(id: string | undefined) {
+  return useMutation({
+    mutationFn: (request: import("@/types/retrieval").RetrieveRequest) =>
+      retrieveRepository(id as string, request),
+  });
+}
+
+export function useIntelligentSearch(id: string | undefined) {
+  return useMutation({
+    mutationFn: (request: import("@/types/retrieval").RetrieveRequest) =>
+      searchRepositoryIntelligent(id as string, request),
+  });
+}
+
+export function useLookup(id: string | undefined) {
+  return useMutation({
+    mutationFn: ({ query, kind }: { query: string; kind?: string }) =>
+      lookupRepository(id as string, query, kind),
+  });
+}
+
+export function useSuggestions(id: string | undefined, prefix: string, enabled = true) {
+  return useQuery({
+    queryKey: ["retrieval-suggestions", id, prefix],
+    queryFn: () => getSuggestions(id as string, prefix),
+    enabled: Boolean(id) && enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useQueryHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: ["retrieval-history", id],
+    queryFn: () => getQueryHistory(id as string),
+    enabled: Boolean(id),
+  });
+}
+
+export function useRetrievalMetrics(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["retrieval-metrics", id],
+    queryFn: () => getRetrievalMetrics(id as string),
+    enabled: Boolean(id) && enabled,
+    retry: false,
   });
 }

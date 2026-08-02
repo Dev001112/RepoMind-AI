@@ -72,3 +72,9 @@ INFO:     127.0.0.1:63262 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d4
 INFO:     127.0.0.1:63671 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/knowledge HTTP/1.1" 200 OK
 INFO:     127.0.0.1:54432 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/knowledge/stats HTTP/1.1" 200 OK
 INFO:     127.0.0.1:56743 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/chunks?page=1&page_size=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56493 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54841 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65245 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/knowledge/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50712 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/knowledge HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51350 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62227 - "GET /api/v1/repositories/b11218ff-cafc-4abc-8743-d49d623bd967/chunks?page=1&page_size=12 HTTP/1.1" 200 OK

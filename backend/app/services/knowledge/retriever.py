@@ -96,15 +96,23 @@ class KnowledgeRetriever:
         query: str,
         filters: ChunkFilters | None = None,
         limit: int = 10,
+        keyword_query: str | None = None,
     ) -> list[SearchHit]:
         """Dense leg + full-text-keyword-constrained leg, fused with local RRF.
 
         Each leg retrieves limit*4 points; a point's hybrid score is the sum
         of 1/(K + rank) over the legs it appears in, so keyword matches rank
-        above pure semantic lookalikes without drowning dense relevance."""
+        above pure semantic lookalikes without drowning dense relevance.
+
+        `keyword_query` (defaulting to `query`) lets a caller separate the
+        phrase the vector leg embeds (an expanded, synonym-rich rewrite) from
+        the phrase the keyword leg tokenizes (the user's original words -- the
+        rewriter's synonyms match the index's vocabulary but also fire on
+        common import statements, flooding the keyword leg with files that
+        merely `import flask`)."""
         if not self._collection_exists():
             return []
-        keywords = _keyword_tokens(query)
+        keywords = _keyword_tokens(keyword_query if keyword_query is not None else query)
         base_filter = self._build_filter(repository_id, filters)
         if not keywords:
             # Nothing to fuse with -- pure vector search.
@@ -167,6 +175,44 @@ class KnowledgeRetriever:
                     if detail is not None:
                         related[neighbor_id] = detail.to_search_hit()
         return [*hits, *related.values()]
+
+    def exact_lookup(
+        self,
+        repository_id: str,
+        query: str,
+        *,
+        kind: str | None = None,
+        limit: int = 10,
+    ) -> list[SearchHit]:
+        """Case-insensitive exact matching on title / symbol / file / type --
+        the "I know the name" leg of the intelligent retriever (Phase 3.3),
+        used when fuzzy vector search would be wrong. `kind` optionally
+        restricts to a chunk type (file, function, class, api_endpoint...)."""
+        needle = query.strip().lower()
+        if not needle:
+            return []
+        normalized_kind = _normalize_lookup_kind(kind)
+        records = self._scroll_repository(repository_id)
+        hits: list[SearchHit] = []
+        for record in records:
+            payload = record.payload
+            chunk_type = payload.get("type", "")
+            if normalized_kind and normalized_kind not in {"any", "symbol"} and chunk_type != normalized_kind:
+                continue
+            title = (payload.get("title") or "").lower()
+            symbol = (payload.get("symbol") or "").lower()
+            file = (payload.get("file") or "").lower()
+            if needle not in title and needle not in symbol and needle not in file:
+                continue
+            if normalized_kind == "symbol" and needle != symbol and needle not in symbol:
+                continue
+            hit = self._to_hit(
+                type("ScrollPoint", (), {"payload": payload, "score": 1.0 - (0.01 * min(len(hits), 5))})()
+            )
+            hits.append(hit)
+            if len(hits) >= limit:
+                break
+        return hits
 
     # -- index reads ----------------------------------------------------------
 
@@ -319,6 +365,28 @@ class KnowledgeRetriever:
             ],
             related_chunks=payload.get("related_chunks", []),
         )
+
+
+def _normalize_lookup_kind(kind: str | None) -> str | None:
+    if not kind:
+        return None
+    return {
+        "api": "api_endpoint",
+        "endpoint": "api_endpoint",
+        "route": "api_endpoint",
+        "function": "function",
+        "method": "function",
+        "class": "class",
+        "file": "file",
+        "folder": "folder",
+        "db": "database",
+        "database": "database",
+        "doc": "documentation",
+        "documentation": "documentation",
+        "dependency": "dependency",
+        "security": "security",
+        "performance": "performance",
+    }.get(kind.lower(), kind.lower())
 
 
 def _keyword_tokens(query: str) -> list[str]:

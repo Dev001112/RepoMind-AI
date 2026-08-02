@@ -6,17 +6,15 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
-  Search,
-  Sparkles,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Markdown } from "@/components/Markdown";
+import { RetrievalSearch } from "@/components/retrieval/RetrievalSearch";
 import { cn } from "@/lib/utils";
 import {
-  useKnowledgeSearch,
   useKnowledgeStats,
   useRepository,
   useRepositoryAnalysisRuns,
@@ -28,7 +26,6 @@ import {
 } from "@/hooks/useRepositories";
 import type {
   ChatMessage,
-  KnowledgeSearchHit,
   RepositoryStatus,
   StageProgress,
 } from "@/types/repository";
@@ -449,60 +446,15 @@ const CHUNK_TYPE_LABEL: Record<string, string> = {
   quality: "quality",
 };
 
-function KnowledgeHitCard({ hit }: { hit: KnowledgeSearchHit }) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-2 py-3">
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <Badge variant="outline">{CHUNK_TYPE_LABEL[hit.type] ?? hit.type}</Badge>
-          <span className="font-medium text-foreground">{hit.title}</span>
-          <span className="ml-auto text-success">{Math.round(hit.score * 100)}%</span>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">{hit.summary}</p>
-        {(hit.file || hit.symbol) && (
-          <p className="truncate font-mono text-xs text-muted-foreground/70">
-            {hit.file}
-            {hit.symbol ? ` › ${hit.symbol}` : ""}
-          </p>
-        )}
-        {hit.relatedChunks.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-mono text-xs text-muted-foreground/50">related</span>
-            {hit.relatedChunks.slice(0, 4).map((related) => (
-              <Badge key={related.chunkId} variant="outline" className="font-mono text-[10px]">
-                {related.title}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function KnowledgeExplorer({ id }: { id: string }) {
   const { data: stats } = useKnowledgeStats(id, true);
-  const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"semantic" | "hybrid">("semantic");
   const [activeType, setActiveType] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const search = useKnowledgeSearch(id);
   const chunkPage = useRepositoryChunks(id, {
     chunkType: activeType ?? undefined,
     page,
     pageSize: 12,
   });
-
-  function runSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    search.mutate({
-      query: trimmed,
-      mode,
-      filters: activeType ? { type: activeType } : {},
-    });
-  }
 
   function toggleType(chunkType: string) {
     setActiveType((current) => (current === chunkType ? null : chunkType));
@@ -525,64 +477,7 @@ function KnowledgeExplorer({ id }: { id: string }) {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-mono text-sm font-medium text-muted-foreground">
-            knowledge explorer
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <form
-            onSubmit={runSearch}
-            className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-2.5 focus-within:ring-1 focus-within:ring-ring"
-          >
-            <Search className="h-4 w-4 text-primary" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="search the knowledge -- try 'how does authentication work'"
-              className="flex-1 bg-transparent font-mono text-sm placeholder:text-muted-foreground focus:outline-none"
-            />
-            <Button type="submit" size="sm" disabled={search.isPending} className="gap-1.5">
-              {search.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              search
-            </Button>
-          </form>
-
-          <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              semantic
-            </span>
-            <button
-              type="button"
-              onClick={() => setMode((m) => (m === "semantic" ? "hybrid" : "semantic"))}
-              className={cn(
-                "rounded-full border px-3 py-1 transition-colors",
-                mode === "hybrid"
-                  ? "border-primary text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              hybrid (keyword + vector)
-            </button>
-          </div>
-
-          {search.data && search.data.results.length === 0 && (
-            <p className="font-mono text-xs text-muted-foreground">
-              no knowledge matched "{search.data.query}" -- try different wording, or clear the
-              category filter.
-            </p>
-          )}
-          {search.data?.results.map((hit) => (
-            <KnowledgeHitCard key={hit.chunkId} hit={hit} />
-          ))}
-        </CardContent>
-      </Card>
+      <RetrievalSearch repositoryId={id} />
 
       <Card>
         <CardHeader>

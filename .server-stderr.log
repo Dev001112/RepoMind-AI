@@ -1,0 +1,105 @@
+INFO:     Will watch for changes in these directories: ['D:\\repomind ai\\backend\\app']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [27744] using WatchFiles
+INFO:     Started server process [14252]
+INFO:     Waiting for application startup.
+2026-08-01 23:55:34 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'repositories\13ca8794-2493-4f23-805d-be9dc6085749\backend\services\research.py', 'repositories\13ca8794-2493-4f23-805d-be9dc6085749\backend\services\__init__.py', 'repositories\13ca8794-2493-4f23-805d-be9dc6085749\backend\main.py', 'repositories\13ca8794-2493-4f23-805d-be9dc6085749\backend\services\agents.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-08-02 10:16:05 | INFO     | app.main | Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14252]
+INFO:     Started server process [26212]
+INFO:     Waiting for application startup.
+2026-08-02 10:16:11 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\retrieval\compressor.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-08-02 12:37:46 | INFO     | app.main | Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26212]
+WARNING:  WatchFiles detected changes in 'app\services\knowledge\retriever.py', 'tests\services\test_retrieval_pipeline.py', 'app\services\retrieval\engine.py', 'app\services\retrieval\compressor.py'. Reloading...
+INFO:     Started server process [19056]
+INFO:     Waiting for application startup.
+2026-08-02 12:37:53 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 123, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+WARNING:  WatchFiles detected changes in 'tests\services\test_retrieval_engine.py'. Reloading...
+INFO:     Started server process [7504]
+INFO:     Waiting for application startup.
+2026-08-02 12:37:58 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 123, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gandh\AppData\Local\Programs\Python\Python312\Lib\asyncio\queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+INFO:     Started server process [3796]
+INFO:     Waiting for application startup.
+2026-08-02 12:38:03 | INFO     | app.main | Starting RepoMind AI (env=development)
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests\services\test_retrieval_engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-08-02 12:38:45 | INFO     | app.main | Shutdown complete
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3796]

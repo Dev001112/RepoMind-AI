@@ -113,7 +113,7 @@ cd backend
 pytest
 ```
 
-116 tests covering detectors, the knowledge builder, the analysis pipeline orchestrator, the
+177 tests covering detectors, the knowledge builder, the analysis pipeline orchestrator, the
 analysis observability layer (runs/events/detector results/metrics/progress), the Semantic
 Knowledge Index (chunk builder, checksum-incremental embedding, retriever — against a throwaway
 Qdrant collection with deterministic local embeddings, no model or network), and a migration
@@ -145,6 +145,31 @@ semantic chunks and indexes those. It needs Ollama (embeddings) and Qdrant only:
   `GET /repositories/{id}/knowledge/stats` — all read-only against the vector index.
 - **Frontend:** the repository page shows the Knowledge Explorer (stats grid, search with
   semantic/hybrid toggle, category filters, paginated chunk list).
+
+## The Intelligent Retrieval Engine (Phase 3.3)
+
+User query → Intent Analyzer → Query Rewriter → Metadata Extractor → Retrieval Planner →
+Hybrid Search → Relationship Expansion → Context Ranking → Context Builder → `RetrievalContext`.
+Every stage under `backend/app/services/retrieval/` is deterministic and LLM-free — the LLM only
+enriches chunks at analysis time. The engine caches per repo (5 min TTL) on
+(repo + query + mode + filters + limit + depth + budget); second identical fetches are ~instant.
+
+- **Retrieval modes:** `auto` (planner picks from intent), `semantic`, `hybrid`, `exact`,
+  `relationship`, `architecture`, `dependency`, `documentation`. API:
+  `POST /repositories/{id}/retrieve` (full pipeline), `POST /repositories/{id}/search/intelligent`
+  (same + history), `POST /repositories/{id}/lookup` (names: file/function/class/symbol/api),
+  `GET /repositories/{id}/suggestions?q=`, `GET /repositories/{id}/history`,
+  `GET /repositories/{id}/retrieval/metrics`.
+- **Frontend:** `frontend/src/components/retrieval/RetrievalSearch.tsx` is the search-first UX:
+  search bar with suggestions, mode chips, intent/confidence/latency/cache badges, ranked cards
+  with 0..100 scores and related-chunk chips, graph preview, query history.
+- **Retrieval history:** one `retrieval_queries` row per run (query, intent, mode, latency,
+  chunk count, cache hit, quality). Aggregation lives in the metrics endpoint; history is for
+  the search card's "history" toggle.
+- **Testing:** `pytest tests/test_retrieval_*.py tests/services/test_retrieval_*.py tests/test_retrieval_api.py`.
+  Pipeline stages are hermetic (stubs); the engine and API tests run against a local Qdrant
+  with deterministic embeddings, so **stop the dev server first** if it's holding the local
+  storage lock.
 
 ## A note on the Gemini key
 

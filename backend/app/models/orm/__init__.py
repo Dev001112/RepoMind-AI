@@ -6,6 +6,7 @@ from app.models.orm.analysis import (
 )
 from app.models.orm.knowledge import RepositoryKnowledge
 from app.models.orm.repository import Repository
+from app.models.orm.retrieval import RetrievalQueryRecord
 
 __all__ = [
     "Repository",
@@ -14,4 +15,5 @@ __all__ = [
     "AnalysisEvent",
     "DetectorResultRecord",
     "RepositoryMetric",
+    "RetrievalQueryRecord",
 ]

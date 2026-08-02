@@ -240,6 +240,73 @@ Search reads hit only the vector index — nothing re-parses the repository. The
 Knowledge Explorer (`frontend/src/pages/RepositoryPage.tsx`) renders the stats grid, the search
 box with a semantic/hybrid toggle, category filters, and the paginated chunk list.
 
+## Intelligent retrieval engine (Phase 3.3)
+
+User query → Intent Analyzer → Query Rewriter → Metadata Extractor → Retrieval Planner →
+Hybrid Search → Relationship Expansion → Context Ranking → Context Builder → `RetrievalContext`.
+Every stage is an independent, deterministic service under `app/services/retrieval/` — no LLM is
+involved in retrieval (the LLM only enriches chunks at analysis time; reasoning over the context
+is the future agent's job).
+
+- **IntentAnalyzer** (`intent.py`) — lexicon + pattern classification over the 16 supported
+  intents (architecture, explanation, setup, deployment, api, database, security, performance,
+  dependencies, documentation, file/function/class lookup, comparison, bug investigation,
+  feature location). Scores = 0.60·word-hit share + 0.30·phrase hit + 0.10·pattern hit; a
+  "how/what/why" question that names a concrete domain (auth, database, api...) promotes that
+  content intent over the generic explanation fallback. Multi-intent queries return the top four
+  hypotheses; the planner acts on the primary one.
+- **QueryRewriter** (`query_rewriter.py`) — deterministic term expansion: a domain synonym
+  lexicon (auth → authentication/token/jwt/oauth/login; db → database/sql/...), camelCase and
+  snake_case splitting on the original query casing (`JWTAuth` → jwt, auth), and idempotent
+  output (same input → same expansion) so caching and tests hold. The rewritten query feeds both
+  the vector leg and the full-text keyword leg — the exact leg intentionally receives the
+  original text (expansions would never match a name).
+- **MetadataExtractor** (`metadata.py`) — pulls concrete indexed facts out of the query text
+  (a framework/language name that exists in the index, a path like `api/auth.py`, an API route
+  like `/login`, a symbol name) and emits an `ExtractedMetadata`. A per-repo `RepoProfile`
+  (languages/frameworks from index stats, cached 5 min) disambiguates which words are actually
+  present — "react" only becomes a framework filter if the index contains one.
+- **RetrievalPlanner** (`planner.py`) — maps (intent × mode) to a concrete plan: which legs run
+  (`exact`/`semantic`/`hybrid`/`relationship`), which chunk types to boost, and the expansion
+  depth. Exploratory intents (comparison, explanation, bug investigation, feature location) get
+  relationship expansion by default; lookup intents run exact+hybrid; API/DB/security/
+  dependencies run hybrid with type restrictions. Explicit modes (semantic, hybrid, exact,
+  relationship, architecture, dependency, documentation) override the intent's default.
+- **RelationshipExpander** (`relationship.py`) — walks the `related_chunks` edges stored in
+  chunk payloads up to the plan's depth (capped: 8 hits/node, 2 hops, 32 total), skipping
+  already-visited targets, into a `KnowledgeGraph` the caller can render.
+- **ContextReranker** (`reranker.py`) — blends similarity + importance + confidence + a
+  type-fit bonus (chunk type in the intent's target list) minus a hop discount into a
+  0..100 `display_score`, then orders and compresses; the ContextCompressor (`compressor.py`)
+  drops duplicates, trims low-score tail chunks to a token budget (est. len/4), orders the
+  output by section (summary/architecture first, then files, APIs, database, security, ...) and
+  reports a compression ratio.
+- **ContextBuilder** (`builder.py`) — assembles the `RetrievalContext`: the query, primary
+  intent, rewritten query, ranked chunks, relationships, a stitched summary (verbatim from
+  summary/architecture chunks — never generated), a confidence score (mean of top-3 display
+  scores, floored at 5%), extracted metadata, citations, repository version, and the graph.
+- **IntelligentRetriever** (`engine.py`) — orchestrator + TTL cache (5 min, keyed on repo +
+  normalized query + mode + filters + limit + depth + budget). Cache hits short-circuit all
+  legs and get a near-zero `latency_ms`; `_record_history` writes every run to
+  `retrieval_queries` (best-effort; never blocks the response), and the metrics endpoint
+  aggregates latency/cache-hit/intent mix per repository.
+
+API surface (`app/api/v1/endpoints/retrieval.py`):
+
+- `POST /repositories/{id}/retrieve` — full pipeline → `RetrieveResponse{ context }`
+- `POST /repositories/{id}/search/intelligent` — same + records history (search-first UX entry)
+- `POST /repositories/{id}/lookup` — exact lookup on titles/symbols/files (`kind` may be
+  `api`, `file`, `function`, `class`, `symbol`, `any`) for "I know the name" queries
+- `GET /repositories/{id}/suggestions?q=` — intent templates plus repo-profile facts
+- `GET /repositories/{id}/history?limit=` — paginated `QueryHistoryResponse`
+- `GET /repositories/{id}/retrieval/metrics` — aggregated latency/cache/intent numbers
+
+The frontend search card (`frontend/src/components/retrieval/RetrievalSearch.tsx`) is
+search-first: the query bar with debounced type-aware suggestions, the mode chips, the metrics
+line (intent, confidence, latency, cache, candidates, compression), the metadata fact badges,
+the ranked result cards with 0..100 scores and hop markers, and the expandable query history
+and knowledge-graph preview.
+
 ## Incremental re-analysis
 
 Checked once, before the expensive clone: for git sources, a cheap `git ls-remote` (no clone)
@@ -336,6 +403,12 @@ milestone events: `KnowledgeChunksBuilt` → 0.4, `EmbeddingsGenerated` → 0.7,
 - `GET /repositories/{id}/chunks` — page through the index (`chunk_type`, `page`, `page_size`)
 - `GET /repositories/{id}/chunks/{chunk_id}` — one chunk with its relationship edges
 - `GET /repositories/{id}/knowledge/stats` — explorer header numbers (totals + categories)
+- `POST /repositories/{id}/retrieve`, `POST /repositories/{id}/search/intelligent` — the Phase 3.3
+  intelligent pipeline (intent → rewrite → metadata → plan → search → expansion → rank → context)
+- `POST /repositories/{id}/lookup` — exact name lookups
+- `GET /repositories/{id}/suggestions` — query suggestions
+- `GET /repositories/{id}/history` — retrieval run history
+- `GET /repositories/{id}/retrieval/metrics` — latency/cache/intent aggregates
 
 ## What's explicitly deferred
 
@@ -350,5 +423,6 @@ milestone events: `KnowledgeChunksBuilt` → 0.4, `EmbeddingsGenerated` → 0.7,
   or maintainability metrics.
 - Qdrant server-side hybrid fusion — the bundled qdrant-client predates `Fusion`/`Prefetch`,
   so hybrid search fuses legs locally with reciprocal-rank fusion instead.
-- Graph traversal beyond one hop — `context_search` returns the hit plus its directly related
-  chunks; deeper walks over `related_chunks` payloads are future work.
+- Graph traversal beyond two hops — the relationship-expansion stage walks seed hits' edges up
+  their plan's depth (max 2 hops, 32 nodes, 8 per hit); deeper subgraph extraction is Phase 3.4
+  agent-side (backed by the `retrieval_queries` history).
